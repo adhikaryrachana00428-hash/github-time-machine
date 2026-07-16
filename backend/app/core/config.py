@@ -1,8 +1,23 @@
+import logging
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+def _int_env(key: str, default: int) -> int:
+    value = os.getenv(key, "")
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning(f"{key}={value!r} is not a valid integer, using default {default}")
+        return default
+
 
 # ── Supabase ──────────────────────────────────────────────────────────
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
@@ -13,13 +28,14 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 
 # ── Embeddings / pgvector ─────────────────────────────────────────────
-EMBEDDING_DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
+EMBEDDING_DIMENSION = _int_env("EMBEDDING_DIMENSION", 1536)
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
 # ── Repository Analysis ───────────────────────────────────────────────
-ANALYSIS_MAX_FILE_SIZE = int(os.getenv("ANALYSIS_MAX_FILE_SIZE", str(1_000_000)))
-ANALYSIS_EMBED_BATCH_SIZE = int(os.getenv("ANALYSIS_EMBED_BATCH_SIZE", "20"))
-ANALYSIS_CLONE_DEPTH = int(os.getenv("ANALYSIS_CLONE_DEPTH", "1"))
+ANALYSIS_MAX_FILE_SIZE = _int_env("ANALYSIS_MAX_FILE_SIZE", 1_000_000)
+ANALYSIS_EMBED_BATCH_SIZE = _int_env("ANALYSIS_EMBED_BATCH_SIZE", 20)
+ANALYSIS_CLONE_DEPTH = _int_env("ANALYSIS_CLONE_DEPTH", 1)
+ANALYSIS_EMBED_CHUNK_SIZE = _int_env("ANALYSIS_EMBED_CHUNK_SIZE", 8000)
 
 # ── Analysis filter constants (centralized, single source of truth) ───
 ANALYSIS_EXCLUDE_DIRS: set[str] = {

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import shutil
 import tempfile
 from datetime import datetime, timezone
@@ -13,12 +14,14 @@ from app.core.config import (
     ANALYSIS_MAX_FILE_SIZE,
     ANALYSIS_EMBED_BATCH_SIZE,
     ANALYSIS_CLONE_DEPTH,
+    ANALYSIS_EMBED_CHUNK_SIZE,
     ANALYSIS_EXCLUDE_DIRS,
     ANALYSIS_SKIP_EXTENSIONS,
     ANALYSIS_SOURCE_EXTENSIONS,
     EXTENSION_LANGUAGE_MAP,
 )
 from app.core.supabase import get_supabase
+from app.services.commit_analyzer import CommitAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +52,10 @@ class RepoAnalyzer:
             clone_path = self._clone()
             files = self._walk(clone_path)
             stored_count = self._store_files(files)
-            symbol_count = self._parse_and_store_symbols(files)
-            self._build_edges_from_imports(files)
+            file_id_map = self._build_file_id_map(files)
+            CommitAnalyzer().extract_and_store(self.repository_id, clone_path)
+            symbol_count = self._parse_and_store_symbols(files, file_id_map)
+            self._build_edges_from_imports(files, file_id_map)
             self._update_repo_metadata()
 
             summary_text = f"{stored_count} files, {sum(len(v) for v in symbol_count.values())} symbols indexed"
@@ -72,10 +77,20 @@ class RepoAnalyzer:
             self._cleanup()
 
     def _clone(self) -> str:
+        self._validate_url(injected_url=self.github_url)
         self._temp_dir = tempfile.mkdtemp(prefix="repo_")
         logger.info(f"Cloning {self.github_url} into {self._temp_dir}")
         Repo.clone_from(self.github_url, self._temp_dir, depth=ANALYSIS_CLONE_DEPTH)
         return self._temp_dir
+
+    @staticmethod
+    def _validate_url(url: str | None = None, injected_url: str | None = None) -> bool:
+        target = injected_url or url
+        if not target:
+            raise ValueError("GitHub URL is required")
+        if not re.match(r"^https://github\.com/[^/]+/[^/]+", target):
+            raise ValueError(f"Invalid GitHub URL: {target}")
+        return True
 
     def _walk(self, root: str) -> list[dict]:
         results = []
@@ -140,7 +155,7 @@ class RepoAnalyzer:
             stored_count += 1
 
             if content.strip():
-                embed_batch.append({"id": record["id"], "content": content[:8000]})
+                embed_batch.append({"id": record["id"], "content": content[:ANALYSIS_EMBED_CHUNK_SIZE]})
 
             if len(embed_batch) >= ANALYSIS_EMBED_BATCH_SIZE:
                 self._generate_and_store_embeddings(embed_batch)
@@ -150,6 +165,15 @@ class RepoAnalyzer:
             self._generate_and_store_embeddings(embed_batch)
 
         return stored_count
+
+    def _build_file_id_map(self, files: list[dict]) -> dict[str, str]:
+        response = (
+            self.supabase.table("files")
+            .select("id, file_path")
+            .eq("repository_id", self.repository_id)
+            .execute()
+        )
+        return {row["file_path"]: row["id"] for row in (response.data or [])}
 
     def _parse_file(self, file_path: str, language: str) -> list[dict]:
         lang = self._get_lang(language)
@@ -281,7 +305,7 @@ class RepoAnalyzer:
 
         return results
 
-    def _parse_and_store_symbols(self, files: list[dict]) -> dict[str, list[str]]:
+    def _parse_and_store_symbols(self, files: list[dict], file_id_map: dict[str, str]) -> dict[str, list[str]]:
         file_ids: dict[str, list[str]] = {}
         all_symbols: list[dict] = []
 
@@ -293,17 +317,10 @@ class RepoAnalyzer:
             if not symbols:
                 continue
 
-            file_record = (
-                self.supabase.table("files")
-                .select("id")
-                .eq("repository_id", self.repository_id)
-                .eq("file_path", f["file_path"])
-                .execute()
-            )
-            if not file_record.data:
+            file_id = file_id_map.get(f["file_path"])
+            if file_id is None:
                 continue
 
-            file_id = file_record.data[0]["id"]
             file_ids[str(file_id)] = []
 
             for sym in symbols:
@@ -332,7 +349,7 @@ class RepoAnalyzer:
         logger.info(f"Stored {len(all_symbols)} symbols across {len(file_ids)} files")
         return file_ids
 
-    def _build_edges_from_imports(self, files: list[dict]) -> None:
+    def _build_edges_from_imports(self, files: list[dict], file_id_map: dict[str, str]) -> None:
         for f in files:
             if not f["is_source"] or f["language"] is None:
                 continue
@@ -343,17 +360,9 @@ class RepoAnalyzer:
             if not imports:
                 continue
 
-            file_record = (
-                self.supabase.table("files")
-                .select("id")
-                .eq("repository_id", self.repository_id)
-                .eq("file_path", f["file_path"])
-                .execute()
-            )
-            if not file_record.data:
+            source_file_id = file_id_map.get(f["file_path"])
+            if source_file_id is None:
                 continue
-
-            source_file_id = str(file_record.data[0]["id"])
 
             for imp in imports:
                 module_name = imp["name"]
@@ -377,38 +386,6 @@ class RepoAnalyzer:
                         "source_name": f["file_path"],
                         "target_name": imp["name"],
                     }, on_conflict="repository_id, source_id, target_id, edge_type").execute()
-        stored_count = 0
-        embed_batch = []
-
-        for f in files:
-            if not f["is_source"] or f["size"] > max_file_size or f["size"] == 0:
-                self._insert_file_record(f, content=None, embedding=None)
-                stored_count += 1
-                continue
-
-            try:
-                with open(f["full_path"], "rb") as fh:
-                    raw = fh.read()
-                content = raw.decode("utf-8", errors="replace")
-            except Exception:
-                self._insert_file_record(f, content=None, embedding=None)
-                stored_count += 1
-                continue
-
-            record = self._insert_file_record(f, content=content, embedding=None)
-            stored_count += 1
-
-            if content.strip():
-                embed_batch.append({"id": record["id"], "content": content[:8000]})
-
-            if len(embed_batch) >= embed_batch_size:
-                self._generate_and_store_embeddings(embed_batch)
-                embed_batch.clear()
-
-        if embed_batch:
-            self._generate_and_store_embeddings(embed_batch)
-
-        return stored_count
 
     def _insert_file_record(self, f: dict, content: str | None, embedding: list[float] | None) -> dict:
         payload = {

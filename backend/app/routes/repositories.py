@@ -38,6 +38,9 @@ def _run_analysis(repository_id: str, github_url: str) -> None:
 async def submit_repository(body: RepositorySubmitRequest, background_tasks: BackgroundTasks):
     supabase = get_supabase()
 
+    if not RepoAnalyzer._validate_url(injected_url=body.github_url):
+        raise HTTPException(status_code=400, detail="Invalid GitHub URL. Must be https://github.com/<owner>/<repo>")
+
     repo_response = (
         supabase.table("repositories")
         .insert({"github_url": body.github_url})

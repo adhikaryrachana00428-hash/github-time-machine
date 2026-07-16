@@ -110,7 +110,6 @@ async def connect_repository(
             "username": username,
             "email": email,
             "avatar_url": avatar_url,
-            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         supabase.table("users").upsert(db_user_payload, on_conflict="id").execute()
@@ -129,9 +128,5 @@ async def connect_repository(
             "username": username,
             "email": email,
             "avatar_url": avatar_url
-        },
-        "session": {
-            "access_token": supabase_jwt,
-            "github_access_token": body.github_access_token
         }
     }
