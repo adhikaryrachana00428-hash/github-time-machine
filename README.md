@@ -1,95 +1,134 @@
-# ⏳ GitHub Time Machine
+# GitHub Time Machine
 
-**GitHub Time Machine** is an AI-powered engineering intelligence platform that provides deep insights into your repositories. It allows you to visualize commit timelines, understand complex code architectures, simulate the impact of changes, and identify technical debt through intuitive heatmaps.
+GitHub Time Machine is an engineering intelligence platform for understanding how a repository changes over time. It combines repository metadata, commit history, code structure, and AI-assisted analysis so teams can answer architecture, impact, timeline, and technical debt questions from one interface.
 
----
+## Problem Statement
 
-## 🚀 Key Features
+Large codebases lose context quickly. Engineers inherit decisions that are spread across commits, files, issues, and tribal knowledge. Before making a change, they often need to understand which files are risky, why an architecture evolved, and what downstream behavior may break.
 
-- **Architectural Explanations:** Understand complex repository structures and module interactions through AI-driven chat.
-- **Change Impact Simulator:** Predict the downstream effects of your code modifications before you commit.
-- **Knowledge Graph:** Visualize the relationships between different parts of your codebase.
-- **Commit Timeline:** A beautiful, interactive timeline of repository events.
-- **Technical Debt Heatmap:** Identify high-churn or problematic areas of your code at a glance.
+## Solution
 
-## 🛠️ Tech Stack
+GitHub Time Machine turns repository history into searchable and visual engineering context. The product indexes repository data, stores analysis state in Supabase, serves repository workflows through a core backend, provides AI orchestration endpoints for insights, and exposes the experience through a Next.js frontend.
 
-- **Frontend:** [Next.js 15](https://nextjs.org/) + [React 19](https://react.dev/)
-- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
-- **AI Backend / API:** [FastAPI](https://fastapi.tiangolo.com/) (Python)
-- **AI Engine:** OpenAI Integration
-- **Database:** Supabase (Planned integration)
+## Features
 
-## 📁 Project Structure
+- Architecture explanations through AI-assisted chat.
+- Change impact simulation for proposed edits.
+- Knowledge graph views for modules, files, and relationships.
+- Commit timeline for repository events and historical context.
+- Technical debt and file health views for high-risk areas.
+- Repository submission, analysis status, and chat history backed by Supabase.
 
-The repository is organized into the following main directories:
+## Architecture
+
+```text
+Frontend (Next.js)
+    |
+    | user workflows, repository pages, visual panels
+    v
+Core Backend (FastAPI + Supabase)
+    |
+    | repository records, analysis status, chat history
+    v
+Supabase
+
+AI Service (FastAPI + OpenAI)
+    |
+    | chat, graph, impact, timeline, heatmap, bug origin, refactor planning
+    v
+Mock data provider today, replaceable with real repository data provider
+```
+
+The project currently has two FastAPI services:
+
+- `backend/`: core application API for repository submission, analysis status, and persisted chat records.
+- `ai/`: AI orchestration API for repository intelligence endpoints and demo-mode analysis.
+
+## Tech Stack
+
+- Frontend: Next.js 15, React 19, TypeScript, Tailwind CSS v4, Heroicons.
+- Core backend: FastAPI, Pydantic, Supabase Python client, Uvicorn.
+- AI service: FastAPI, OpenAI SDK, Jinja2 prompts, SSE support, mock repository data.
+- Database: Supabase.
+
+## Repository Structure
 
 ```text
 github-time-machine/
-├── ai/          # AI orchestration backend (FastAPI + OpenAI)
-├── backend/     # Core application backend services
-├── frontend/    # Next.js web application
-├── data/        # Mock data and datasets
-└── docs/        # Additional project documentation
+├── ai/          # AI orchestration service and prompt-powered analysis endpoints
+├── backend/     # Core API, Supabase integration, repository workflows
+├── data/        # Project data area for datasets or fixtures
+├── docs/        # Project documentation
+└── frontend/    # Next.js web application
 ```
 
-## 🏁 Getting Started
+## Installation
 
 ### Prerequisites
 
-- **Node.js** (v18 or higher)
-- **Python** (3.9 or higher)
-- **OpenAI API Key**
+- Node.js 18 or higher.
+- Python 3.9 or higher.
+- OpenAI API key for AI endpoints that call OpenAI.
+- Supabase project URL and service key for the core backend.
 
-### 1. AI Backend Setup
-
-Navigate to the `ai` directory to set up the orchestration service.
+### AI Service
 
 ```bash
 cd ai
-
-# Create and activate a virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Configure environment variables
-cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
-
-# Run the backend server
 uvicorn app.main:app --reload --port 8001
 ```
-*(For detailed endpoint information and demo mode, see the [AI README](./ai/README.md).)*
 
-### 2. Frontend Setup
+Create `ai/.env` if you want local environment configuration. Set `OPENAI_API_KEY` before using endpoints that call OpenAI.
 
-Navigate to the `frontend` directory to launch the web application.
+### Core Backend
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
+
+Set `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and any CORS settings expected by `backend/app/core/config.py`.
+
+### Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start the development server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
+Open `http://localhost:3000`.
 
-## 🤝 Contributing
+## Demo
 
-Contributions are welcome! If you'd like to improve the GitHub Time Machine, please fork the repository, create a feature branch, and submit a pull request.
+The AI service includes a standalone demo repository with `repo_id = "demo"`. It can return graph, timeline, heatmap, and other analysis responses without a database.
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+```bash
+curl http://localhost:8001/repos/demo/graph?depth=2
+curl http://localhost:8001/repos/demo/timeline
+curl http://localhost:8001/repos/demo/heatmap
+```
 
-## 📄 License
+The frontend currently presents the product entry flow, GitHub sign-in route, and repository dashboard components. The core backend exposes repository submission and status APIs for Supabase-backed workflows.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## Team
+
+| Name | Role | GitHub |
+|------|------|--------|
+| Sai Karthik | PM / Product Owner — repo mgmt, architecture, AI prompt design, integration testing, demo | @sai-karthik-dev |
+| Anmol | Frontend — landing page, dashboard UI, auth screens, responsive design, component library, visualizations | @pvtt-anmol2 |
+| Foysal Ahmed Pranto | Backend — FastAPI setup, AI orchestration, auth API, business logic, Railway deployment | @foysalpranto121 |
+| Fernando Rodríguez López | Backend — Git analysis APIs, code processing endpoints, REST API architecture, data flow | @FerLpz55 |
+| Vijay Babu | Database — Supabase setup, connection pooling, backups, schema | @vjbabu3 |
+| Rachana | Backend — commit analyzer, timeline events | @adhikaryrachana00428-hash |
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE` for details.
