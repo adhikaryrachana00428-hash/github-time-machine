@@ -31,7 +31,6 @@ export default function ImpactPanel({ repoId }: { repoId: string }) {
   const [selectedFile, setSelectedFile] = useState("");
   const [changeType, setChangeType] = useState("modify");
   const [loading, setLoading] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImpactResult | null>(null);
   const [bugOriginResult, setBugOriginResult] = useState<BugOriginResult | null>(null);
   const [error, setError] = useState<string | null>(null);
