@@ -87,3 +87,23 @@ class RepositoryListItem(BaseModel):
 
 class RepositoryListResponse(BaseModel):
     repositories: list[RepositoryListItem]
+
+
+class TimelineEvent(BaseModel):
+    sha: str
+    date: Optional[datetime] = None
+    author: Optional[str] = None
+    message: Optional[str] = None
+    is_fix: bool = False
+    is_merge: bool = False
+
+
+class TimelineStats(BaseModel):
+    total_commits: int = 0
+    date_range: Optional[dict] = None
+    top_authors: list[str] = []
+
+
+class TimelineResponse(BaseModel):
+    events: list[TimelineEvent] = []
+    stats: Optional[TimelineStats] = None

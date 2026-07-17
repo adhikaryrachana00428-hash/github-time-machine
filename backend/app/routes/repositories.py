@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
@@ -17,10 +18,16 @@ from app.models.schemas import (
     RepositoryProcessing,
     RepositoryResponse,
     RepositorySubmitRequest,
+    TimelineEvent,
+    TimelineResponse,
+    TimelineStats,
 )
 from app.services.repo_analyzer import RepoAnalyzer
 
 logger = logging.getLogger(__name__)
+
+_FIX_PATTERN = re.compile(r"\b(fix|bug|patch|hotfix|resolve|close)\b", re.IGNORECASE)
+_MERGE_PATTERN = re.compile(r"^merge", re.IGNORECASE)
 
 router = APIRouter(prefix="/repositories", tags=["repositories"])
 
@@ -261,3 +268,64 @@ async def get_chat_history(repo_id: UUID, limit: int = Query(50, le=100)):
         )
         for r in (response.data or [])
     ]
+
+
+@router.get("/{repo_id}/timeline", response_model=TimelineResponse)
+async def get_repository_timeline(
+    repo_id: UUID,
+    limit: int = Query(100, le=500),
+    offset: int = 0,
+):
+    supabase = get_supabase()
+
+    repo_response = supabase.table("repositories").select("id").eq("id", str(repo_id)).execute()
+    if not repo_response.data:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    commits_response = (
+        supabase.table("commits")
+        .select("*", count="exact")
+        .eq("repository_id", str(repo_id))
+        .order("commit_date", desc=True)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+
+    total = commits_response.count or 0
+
+    if total == 0:
+        return TimelineResponse(events=[], stats=None)
+
+    events = []
+    for c in commits_response.data or []:
+        message = c.get("message") or ""
+        events.append(TimelineEvent(
+            sha=c.get("commit_sha", ""),
+            date=datetime.fromisoformat(c["commit_date"]) if c.get("commit_date") else None,
+            author=c.get("author"),
+            message=message[:200],
+            is_fix=bool(_FIX_PATTERN.search(message)),
+            is_merge=bool(_MERGE_PATTERN.search(message)),
+        ))
+
+    dates = sorted([
+        c["commit_date"] for c in commits_response.data
+        if c.get("commit_date")
+    ]) if commits_response.data else []
+
+    author_counts: dict[str, int] = {}
+    for c in commits_response.data or []:
+        author = c.get("author")
+        if author:
+            author_counts[author] = author_counts.get(author, 0) + 1
+
+    stats = TimelineStats(
+        total_commits=total,
+        date_range={
+            "start": dates[0] if dates else None,
+            "end": dates[-1] if dates else None,
+        },
+        top_authors=sorted(author_counts, key=author_counts.get, reverse=True)[:5],
+    )
+
+    return TimelineResponse(events=events, stats=stats)
