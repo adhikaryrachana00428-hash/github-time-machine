@@ -21,7 +21,8 @@ export default function FileHealthBadge({ repoId, path, showLabel = false }: { r
     const fetchHealth = async () => {
       setLoading(true);
       try {
-        const url = `http://localhost:8001/repos/${repoId}/file_health?path=${encodeURIComponent(path)}`;
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+        const url = `${API_URL}/repos/${repoId}/file_health?path=${encodeURIComponent(path)}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load health");
         const json = await res.json();

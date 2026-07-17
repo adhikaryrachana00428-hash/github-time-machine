@@ -34,9 +34,25 @@ export default function TimelinePanel({ repoId }: { repoId: string }) {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`http://localhost:8001/repos/${repoId}/timeline?limit=100`);
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${API_URL}/repositories/${repoId}/timeline?limit=100`);
       if (!res.ok) throw new Error("Failed to load timeline events");
       const json = await res.json();
+      if (json && Array.isArray(json.events)) {
+        json.events = json.events.map((e: any, index: number) => ({
+          id: e.id || e.sha || String(index),
+          sha: e.sha || "",
+          message: e.message || "",
+          author: e.author || "Unknown",
+          timestamp: e.timestamp || e.date || new Date().toISOString(),
+          files_changed: e.files_changed || 0,
+          additions: e.additions || 0,
+          deletions: e.deletions || 0,
+          is_significant: e.is_significant || e.is_merge || false,
+          event_type: e.event_type || (e.is_fix ? "fix" : e.is_merge ? "merge" : "commit"),
+          tags: e.tags || (e.is_fix ? ["fix"] : e.is_merge ? ["merge"] : []),
+        }));
+      }
       setData(json);
     } catch (err: any) {
       setError(err.message || "Failed to load timeline");

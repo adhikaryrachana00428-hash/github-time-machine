@@ -32,8 +32,8 @@ export default function RepoDashboard({ params }: { params: Promise<{ id: string
     async function fetchRepo() {
       try {
         setLoading(true);
-        // Call local FastAPI endpoint
-        const response = await fetch(`http://localhost:8001/repos/${repoId}`);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+        const response = await fetch(`${API_URL}/repositories/${repoId}`);
         if (!response.ok) {
           throw new Error(`Failed to load repository '${repoId}'`);
         }

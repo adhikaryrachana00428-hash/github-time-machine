@@ -59,10 +59,13 @@ export default function ChatPanel({ repoId }: { repoId: string }) {
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     try {
-      const response = await fetch(`http://localhost:8001/repos/${repoId}/chat`, {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+      const response = await fetch(`${API_URL}/repositories/${repoId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          repository_id: repoId,
+          question: textToSend,
           message: textToSend,
           file_path: focusFile || undefined,
           session_id: sessionId || undefined,
@@ -71,6 +74,26 @@ export default function ChatPanel({ repoId }: { repoId: string }) {
       });
 
       if (!response.ok) throw new Error("Chat request failed");
+
+      // Handle non-streaming JSON responses from real backend
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastIndex = updated.length - 1;
+          if (lastIndex >= 0 && updated[lastIndex].role === "assistant") {
+            updated[lastIndex] = {
+              role: "assistant",
+              content: data.answer || "",
+            };
+          }
+          return updated;
+        });
+        setLoading(false);
+        return;
+      }
+
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       if (!reader) throw new Error("Stream reader not supported");

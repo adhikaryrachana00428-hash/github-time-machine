@@ -32,7 +32,8 @@ export default function HeatmapPanel({ repoId }: { repoId: string }) {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`http://localhost:8001/repos/${repoId}/heatmap`);
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${API_URL}/repos/${repoId}/heatmap`);
       if (!res.ok) throw new Error("Failed to load tech debt metrics");
       const json = await res.json();
       setData(json);

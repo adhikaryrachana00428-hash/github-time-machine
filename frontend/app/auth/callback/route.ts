@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       const supabaseAccessToken = session.access_token;
 
       if (githubAccessToken && supabaseAccessToken) {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "";
         
         try {
           const connectResponse = await fetch(`${backendUrl}/repos/connect`, {

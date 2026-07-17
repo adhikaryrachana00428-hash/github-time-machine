@@ -12,7 +12,8 @@ export default function RefactorPlanner({ repoId }: { repoId: string }) {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`http://localhost:8001/repos/${repoId}/refactor_plan`, {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${API_URL}/repos/${repoId}/refactor_plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ since_days: 30 })

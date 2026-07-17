@@ -41,7 +41,8 @@ export default function GraphPanel({ repoId }: { repoId: string }) {
     try {
       setLoading(true);
       setError(null);
-      const url = `http://localhost:8001/repos/${repoId}/graph?depth=${depth}`;
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+      const url = `${API_URL}/repositories/${repoId}/graph?depth=${depth}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to load dependency graph");
       const json = await res.json();
@@ -227,7 +228,7 @@ export default function GraphPanel({ repoId }: { repoId: string }) {
                     onClick={() => setSelectedNode(node)}
                   >
                     <circle
-                      r={node.type === "file" ? 8 + node.size : 6}
+                      r={node.type === "file" ? 8 + Math.min(12, node.size > 0 ? Math.log2(node.size) : 0) : 6}
                       fill={color}
                       className={`graph-node-circle ${isSelected ? "selected" : ""}`}
                       filter={isSelected ? "url(#glow-file)" : undefined}

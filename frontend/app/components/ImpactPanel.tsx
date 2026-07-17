@@ -39,7 +39,8 @@ export default function ImpactPanel({ repoId }: { repoId: string }) {
   useEffect(() => {
     async function loadFiles() {
       try {
-        const res = await fetch(`http://localhost:8001/repos/${repoId}/graph`);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+        const res = await fetch(`${API_URL}/repositories/${repoId}/graph`);
         if (res.ok) {
           const json = await res.json();
           const files = json.nodes
@@ -74,7 +75,8 @@ export default function ImpactPanel({ repoId }: { repoId: string }) {
       setResult(null);
       setBugOriginResult(null);
 
-      const res = await fetch(`http://localhost:8001/repos/${repoId}/impact`, {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${API_URL}/repos/${repoId}/impact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -102,7 +104,8 @@ export default function ImpactPanel({ repoId }: { repoId: string }) {
       setResult(null);
       setBugOriginResult(null);
 
-      const res = await fetch(`http://localhost:8001/repos/${repoId}/bug_origin`, {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${API_URL}/repos/${repoId}/bug_origin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_path: selectedFile }),
