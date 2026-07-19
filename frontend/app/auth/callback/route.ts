@@ -7,7 +7,8 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const state = searchParams.get("state");
   
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const requestUrl = new URL(request.url);
+  const siteUrl = `${requestUrl.protocol}//${requestUrl.host}`;
   const cookieStore = await cookies();
 
   // 1. Validate CSRF state

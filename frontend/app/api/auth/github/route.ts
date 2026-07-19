@@ -3,7 +3,10 @@ import { createClient } from "../../../utils/supabase/server";
 import { cookies } from "next/headers";
 import crypto from "crypto";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+  const siteUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+  
   const cookieStore = await cookies();
   
   // 1. Generate a random CSRF state
@@ -12,14 +15,13 @@ export async function GET() {
   // 2. Save state in HTTP-only secure cookie
   cookieStore.set("oauth_state", state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: requestUrl.protocol === "https:",
     sameSite: "lax",
     maxAge: 600, // 10 minutes
     path: "/",
   });
 
   const supabase = await createClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const redirectTo = `${siteUrl}/auth/callback`;
 
   // 3. Initiate sign-in with OAuth
@@ -36,7 +38,8 @@ export async function GET() {
 
   if (error || !data.url) {
     console.error("OAuth initiation failed:", error);
-    return NextResponse.redirect(new URL("/login?error=github_not_configured", siteUrl));
+    const errMsg = error ? encodeURIComponent(error.message) : "github_not_configured";
+    return NextResponse.redirect(new URL(`/login?error=${errMsg}`, siteUrl));
   }
 
   return NextResponse.redirect(data.url);
